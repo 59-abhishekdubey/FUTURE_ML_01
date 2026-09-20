@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FUTURE_ML_01 - Retail Demand Intelligence &amp; Forecasting System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <h1>FUTURE_ML_01</h1>
+      <p class="subtitle">Retail Demand Intelligence &amp; Forecasting System</p>
+      <p class="tagline">End-to-end store-sales forecasting with chronological validation and recursive 15-day horizon</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Project Overview -->
+    <section class="card">
+      <h2>Project Overview</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Business Problem</h3>
+          <p>Accurate demand forecasting is critical for inventory planning, staffing and resource allocation. Overstock ties up capital; stockouts lose revenue. This project builds a validated pipeline to predict daily sales per store and product family.</p>
+          <h3>Forecasting Objective</h3>
+          <ul>
+            <li>Predict total daily sales per store &times; family for the next <strong>15 days</strong> (test horizon: 2017-08-16 to 2017-08-31, 16 calendar days in test.csv)</li>
+            <li>Reduce forecast error vs. naive seasonal baseline using engineered lag/rolling features and Ridge regression</li>
+            <li>Generate Kaggle-compatible <code>submission.csv</code> with <code>id, sales</code></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Dataset Information</h3>
+          <ul>
+            <li><strong>train.csv</strong> — 3,000,888 rows, 6 columns (id, date, store_nbr, family, sales, onpromotion). Range 2013-01-01 to 2017-08-15</li>
+            <li><strong>test.csv</strong> — 28,512 rows, 5 columns (id, date, store_nbr, family, onpromotion)</li>
+            <li>54 stores, 33 product families, zero missing values</li>
+            <li>Columns: <code>{{ dataset_info.train_cols | join(', ') }}</code></li>
+          </ul>
+          <h3>Pipeline (Google Colab)</h3>
+          <p>The ML pipeline was developed and executed in Google Colab. The exported notebook <code>notebooks/01_store_sales_forecasting.ipynb</code> is the primary implementation and experiment record. The Flask app presents results; it does not retrain.</p>
+          <p><strong>Forecast horizon:</strong> 15 days (recursive multi-step forecasting)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Model Performance -->
+    <section class="card">
+      <h2>Model Performance</h2>
+      <p class="note"><strong>Note:</strong> WAPE (Weighted Absolute Percentage Error) is an <em>error metric</em> — lower is better. It is not accuracy. WAPE = sum|actual − predicted| / sum|actual|.</p>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Ridge WAPE</div>
+          <div class="metric-value">0.1854</div>
+          <div class="metric-sub">Ridge regression (StandardScaler + Ridge α=1.0)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Baseline WAPE</div>
+          <div class="metric-value">0.2177</div>
+          <div class="metric-sub">Seasonal Naive (lag_7)</div>
+        </div>
+        <div class="metric highlight">
+          <div class="metric-label">Improvement</div>
+          <div class="metric-value">14.7%</div>
+          <div class="metric-sub">Reduction in WAPE vs. Seasonal Naive</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:1rem">
+        <div>
+          <h3>Validation Details</h3>
+          <ul>
+            <li>Chronological split: cutoff 2017-08-01 (train 2,974,158 rows, val 26,730 rows)</li>
+            <li>Features (14): store_nbr, family (one-hot), onpromotion, year, month, day, dayofweek, week, quarter, is_weekend, lag_1/7/14, rolling_mean_7</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Full Comparison</h3>
+          <table class="mini-table">
+            <thead><tr><th>Model</th><th>WAPE</th><th>MAE</th><th>RMSE</th></tr></thead>
+            <tbody>
+              <tr><td>Naive (lag_1)</td><td>0.2330</td><td>108.39</td><td>368.80</td></tr>
+              <tr><td>Seasonal Naive (lag_7)</td><td>0.2177</td><td>101.25</td><td>353.80</td></tr>
+              <tr><td><strong>Ridge</strong></td><td><strong>0.1854</strong></td><td>86.26</td><td>250.69</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Forecast Overview -->
+    <section class="card">
+      <h2>Forecast Overview</h2>
+      {% if forecast.found %}
+        <p>Loaded from <code>{{ forecast.submission_path }}</code> — {{ forecast.summary.rows }} rows.
+        {% if forecast.summary.date_min %} Horizon: {{ forecast.summary.date_min }} to {{ forecast.summary.date_max }} ({{ forecast.summary.horizon_days }} days).{% endif %}
+        Total forecasted sales: <strong>{{ "%.2f"|format(forecast.summary.sales_sum) }}</strong> | Mean: {{ "%.2f"|format(forecast.summary.sales_mean) }} | Range: {{ "%.2f"|format(forecast.summary.sales_min) }} – {{ "%.2f"|format(forecast.summary.sales_max) }}
+        </p>
+        {% if forecast.summary.missing == 0 and forecast.summary.negative == 0 %}
+          <p class="ok">✓ No missing, no negative predictions. ID order validated.</p>
+        {% else %}
+          <p class="warn">Missing: {{ forecast.summary.missing }}, Negative: {{ forecast.summary.negative }}</p>
+        {% endif %}
+      {% else %}
+        <p class="warn">⚠ Forecast file not found: {{ forecast.error }}</p>
+        <p>Expected <code>submission.csv</code> in project root or <code>notebooks/submission.csv</code>. Generate it by running the notebook.</p>
+      {% endif %}
+
+      <h3>Chart</h3>
+      {% if figures %}
+        <div class="figure-grid">
+          {% for fname in figures %}
+            <figure>
+              <img src="{{ url_for('serve_figure', filename=fname) }}" alt="{{ fname }}" loading="lazy" />
+              <figcaption>{{ fname }}</figcaption>
+            </figure>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="placeholder">
+          <p>No figures found in <code>reports/figures/</code>. The notebook generates visuals (Visual 1–4: Historical trend, Monthly seasonality, Actual vs Predicted, Future transition). Run the notebook and save figures to <code>reports/figures/</code> to display them here.</p>
+          <p style="margin-top:0.5rem">Fallback summary: The Flask app is presentation-only and does not recreate analysis. Forecast aggregation by date is available in the table below.</p>
+          {% if forecast.found and forecast.enriched is not none %}
+            <p style="margin-top:0.5rem">Daily forecast totals (computed from loaded submission + test.csv) can be inspected in the Future Forecast table.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Actual vs Predicted -->
+    <section class="card">
+      <h2>Actual vs Predicted</h2>
+      <p>Validation period (2017-08-01 onward): Ridge predictions are compared against actual sales aggregated daily. WAPE captures the relative error — <strong>0.1854 (Ridge) vs 0.2177 (Seasonal Naive)</strong>.</p>
+      {% if figures %}
+        <p class="note">If available, Visual 3 (Actual vs Predicted Daily Sales) is shown in Forecast Overview above.</p>
+      {% else %}
+        <div class="placeholder">
+          <p>Visualization file not present. Notebook Visual 3 shows black (Actual Demand) vs darkorange dashed (Ridge Prediction) over the 15-day validation window. The numeric comparison is:</p>
+          <table class="mini-table">
+            <thead><tr><th>Series</th><th>WAPE</th></tr></thead>
+            <tbody>
+              <tr><td>Seasonal Naive</td><td>0.2177</td></tr>
+              <tr><td>Ridge</td><td>0.1854</td></tr>
+            </tbody>
+          </table>
+          <p>Error reduction reflects genuine signal from lag/rolling/calendar features; no leakage (rolling windows shifted by 1).</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Error Analysis -->
+    <section class="card">
+      <h2>Error Analysis</h2>
+      <p class="note">Outputs from notebook Phase 7. Absolute error = |actual − predicted|, averaged per group. Higher values indicate harder-to-forecast segments.</p>
+      <div class="grid-3">
+        <div>
+          <h3>Top 5 Families by Avg Abs Error</h3>
+          <table class="mini-table">
+            <thead><tr><th>Family</th><th style="text-align:right">Abs Error</th></tr></thead>
+            <tbody>
+              {% for r in top_families %}
+                <tr><td>{{ r.family }}</td><td style="text-align:right">{{ "%.2f"|format(r.abs_error) }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Top 5 Stores by Avg Abs Error</h3>
+          <table class="mini-table">
+            <thead><tr><th>Store</th><th style="text-align:right">Abs Error</th></tr></thead>
+            <tbody>
+              {% for r in top_stores %}
+                <tr><td>{{ r.store_nbr }}</td><td style="text-align:right">{{ "%.2f"|format(r.abs_error) }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Top 5 Dates by Avg Abs Error</h3>
+          <table class="mini-table">
+            <thead><tr><th>Date</th><th style="text-align:right">Abs Error</th></tr></thead>
+            <tbody>
+              {% for r in top_dates %}
+                <tr><td>{{ r.date }}</td><td style="text-align:right">{{ "%.2f"|format(r.abs_error) }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% if not figures %}
+        <p class="note" style="margin-top:1rem">No residual/error-distribution figures found in <code>reports/figures/</code>. Displaying structured tabular outputs instead. If the notebook exports CSV/JSON error breakdowns or figures, place them in <code>reports/figures/</code> and they will appear automatically.</p>
+      {% endif %}
+    </section>
+
+    <!-- Future Forecast -->
+    <section class="card">
+      <h2>Future Forecast</h2>
+      <h3>Chart / Table</h3>
+      {% if forecast.found and forecast.enriched is not none %}
+        <p>Enriched view joins <code>test.csv</code> (date, store, family) with predicted <code>sales</code>. Showing first 50 of {{ table_total_rows }} rows.</p>
+      {% elif forecast.found %}
+        <p>Raw submission (<code>id, sales</code>) — showing first 50 of {{ table_total_rows }} rows.</p>
+      {% else %}
+        <p class="warn">No forecast data to display.</p>
+      {% endif %}
+
+      {% if forecast_table %}
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                {% for col in forecast_columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in forecast_table %}
+                <tr>
+                  {% for col in forecast_columns %}
+                    <td>
+                      {% if col == 'sales' %}
+                        {{ "%.2f"|format(row[col]) }}
+                      {% else %}
+                        {{ row[col] }}
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Full forecast: <code>submission.csv</code> ({{ table_total_rows }} rows). Download or inspect locally for complete 15-day horizon.</p>
+      {% endif %}
+
+      {% if not figures %}
+        <div class="placeholder" style="margin-top:1rem">
+          <p>Forecast transition chart (Visual 4: Last 60 days history in royalblue + 15-day recursive forecast in crimson dashed) is generated by the notebook. Save it to <code>reports/figures/</code> to render here.</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Business Insights -->
+    <section class="card">
+      <h2>Business Insights</h2>
+      <ul>
+        <li><strong>Ridge beats Seasonal Naive by 14.7%</strong> (WAPE 0.1854 vs 0.2177) — meaningful inventory accuracy gain without complex ensembling.</li>
+        <li><strong>High-error families:</strong> GROCERY I and BEVERAGES dominate absolute error. These are high-volume, high-variance categories — prioritize safety stock and promotion-aware planning there.</li>
+        <li><strong>High-error stores:</strong> Stores 44, 47, 48, 45, 46 show largest avg error. Investigate local demand drivers (footfall, promotions, assortment) for these locations.</li>
+        <li><strong>High-error dates:</strong> 2017-08-12 and 2017-08-01 (weekend/start-of-month) are hardest to predict — weekend and month-boundary effects. Calendar features help but residual seasonality remains.</li>
+        <li><strong>Recursive forecasting:</strong> Day-by-day feedback loop feeds predicted sales back as lags, enabling coherent 15-day trajectories with no leakage (lags/rolling shifted).</li>
+        <li><strong>Zero negatives, no missing:</strong> All 28,512 predictions clipped to ≥0, ready for submission.</li>
+      </ul>
+      <p class="note">Insights are strictly from notebook outputs above; no statistics are invented. For deeper drill-down, inspect <code>reports/figures/</code> visuals and the notebook's EDA/error sections.</p>
+    </section>
+
+    <footer class="footer">
+      <p>FUTURE_ML_01 • Notebook is source of truth (<code>notebooks/01_store_sales_forecasting.ipynb</code>) • Flask presents results, does not retrain</p>
+      <p><a href="/health">health</a> • Figures: {{ figures|length }} file(s) {% if not figures_dir_exists %}(reports/figures/ missing){% endif %}</p>
+    </footer>
+  </main>
+</body>
+</html>
