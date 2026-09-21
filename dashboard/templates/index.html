@@ -98,39 +98,40 @@
     <section class="card">
       <h2>Sales over time</h2>
       <p class="section-desc">This shows how sales changed over the historical period.</p>
-      {% if figures %}
-        <div class="figure-grid">
-          {% for fname in figures %}
-            <figure>
-              <img src="{{ url_for('serve_figure', filename=fname) }}" alt="{{ fname }}" loading="lazy" />
-              <figcaption>{{ fname }}</figcaption>
-            </figure>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="placeholder">
-          <p>The chart is not available yet. Run the notebook and export the figures to <code>reports/figures/</code>.</p>
-        </div>
-      {% endif %}
+      <div class="figure-grid">
+        {% if charts.historical_sales.exists %}
+          <figure>
+            <img src="{{ url_for('serve_figure', filename=charts.historical_sales.filename) }}" alt="Historical sales trend" loading="lazy" />
+            <figcaption>Historical sales trend</figcaption>
+          </figure>
+        {% else %}
+          <div class="placeholder"><p>Chart not available yet.</p></div>
+        {% endif %}
+        {% if charts.monthly_sales.exists %}
+          <figure>
+            <img src="{{ url_for('serve_figure', filename=charts.monthly_sales.filename) }}" alt="Monthly sales seasonality" loading="lazy" />
+            <figcaption>Monthly sales — seasonality</figcaption>
+          </figure>
+        {% else %}
+          <div class="placeholder"><p>Chart not available yet.</p></div>
+        {% endif %}
+      </div>
     </section>
 
     <!-- Actual vs predicted -->
     <section class="card">
       <h2>Actual sales vs predicted sales</h2>
       <p class="section-desc">During our test period, we compare what actually happened with what the model predicted.</p>
-      {% if figures %}
+      {% if charts.actual_vs_predicted.exists %}
         <div class="figure-grid">
-          {% for fname in figures %}
-            <figure>
-              <img src="{{ url_for('serve_figure', filename=fname) }}" alt="{{ fname }}" loading="lazy" />
-              <figcaption>{{ fname }}</figcaption>
-            </figure>
-          {% endfor %}
+          <figure>
+            <img src="{{ url_for('serve_figure', filename=charts.actual_vs_predicted.filename) }}" alt="Actual vs predicted" loading="lazy" />
+            <figcaption>Actual vs predicted</figcaption>
+          </figure>
         </div>
-        <p class="small-note">If multiple charts are available, the Actual vs Predicted chart is among them. Look for the one comparing two lines over the test period.</p>
       {% else %}
         <div class="placeholder">
-          <p>The chart is not available yet. Run the notebook and export the figures to <code>reports/figures/</code>.</p>
+          <p>Chart not available yet.</p>
           <p style="margin-top:8px">What you would see: two lines day-by-day — one for actual sales and one for the forecast — so you can see where they track closely and where they differ.</p>
         </div>
       {% endif %}
@@ -150,18 +151,16 @@
         <p class="warn">Forecast file not found. Generate <code>submission.csv</code> by running the notebook.</p>
       {% endif %}
 
-      {% if figures %}
+      {% if charts.future_forecast.exists %}
         <div class="figure-grid" style="margin-top:12px">
-          {% for fname in figures %}
-            <figure>
-              <img src="{{ url_for('serve_figure', filename=fname) }}" alt="{{ fname }}" loading="lazy" />
-              <figcaption>{{ fname }}</figcaption>
-            </figure>
-          {% endfor %}
+          <figure>
+            <img src="{{ url_for('serve_figure', filename=charts.future_forecast.filename) }}" alt="Future forecast" loading="lazy" />
+            <figcaption>Future forecast — historical to forecast transition</figcaption>
+          </figure>
         </div>
       {% else %}
         <div class="placeholder">
-          <p>The chart is not available yet. Run the notebook and export the figures to <code>reports/figures/</code>.</p>
+          <p>Chart not available yet.</p>
         </div>
       {% endif %}
 
@@ -241,9 +240,9 @@
       <p class="small-note">Certain dates (e.g., 12 August and 1 August) showed larger gaps, suggesting not all demand changes follow simple calendar patterns.</p>
     </section>
 
-    <!-- What we learned -->
+    <!-- What i learned -->
     <section class="card">
-      <h2>What we learned</h2>
+      <h2>What i learned</h2>
       <ul>
         <li>Some high-volume product categories are harder to predict, especially <strong>Grocery I</strong> and <strong>Beverages</strong>.</li>
         <li>A few stores consistently show larger prediction differences.</li>

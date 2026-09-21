@@ -13,6 +13,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = DASHBOARD_DIR / "templates"
 STATIC_DIR = DASHBOARD_DIR / "static"
+# Expected charts — Flask only displays existing PNGs, never generates them
+EXPECTED_FIGURES = {
+    "historical_sales": "historical_sales.png",
+    "monthly_sales": "monthly_sales.png",
+    "actual_vs_predicted": "actual_vs_predicted.png",
+    "future_forecast": "future_forecast.png",
+}
+
 FIGURES_DIR = PROJECT_ROOT / "reports" / "figures"
 SUBMISSION_CANDIDATES = [
     PROJECT_ROOT / "submission.csv",
@@ -132,6 +140,15 @@ def get_figures():
         return []
 
 
+def get_chart_status():
+    """Check existence of the four expected charts. Uses pathlib, no generation."""
+    status = {}
+    for key, fname in EXPECTED_FIGURES.items():
+        p = FIGURES_DIR / fname
+        status[key] = {"filename": fname, "exists": p.exists(), "path": p}
+    return status
+
+
 def get_error_analysis():
     top_families = [
         {"family": "GROCERY I", "abs_error": 669.87},
@@ -161,6 +178,7 @@ def get_error_analysis():
 def index():
     forecast = load_forecast()
     figures = get_figures()
+    charts = get_chart_status()
     top_families, top_stores, top_dates = get_error_analysis()
 
     # Derived display values (no new calculations beyond formatting)
@@ -256,6 +274,8 @@ def index():
         forecast=forecast,
         figures=figure_names,
         figures_dir_exists=FIGURES_DIR.exists(),
+        charts=charts,
+        expected_figures=EXPECTED_FIGURES,
         forecast_table=table_records,
         forecast_columns=forecast_columns,
         friendly_columns=friendly_columns,
